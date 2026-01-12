@@ -1,0 +1,279 @@
+// Source code is decompiled from a .class file using FernFlower decompiler (from Intellij IDEA).
+package model;
+
+import dao.ImageDAO;
+import java.io.ByteArrayInputStream;
+import java.util.Random;
+import javafx.animation.KeyFrame;
+import javafx.animation.KeyValue;
+import javafx.animation.Timeline;
+import javafx.geometry.Rectangle2D;
+import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
+import javafx.util.Duration;
+
+public class MarineLife {
+   private int id;
+   private String name;
+   private String classification;
+   private int points;
+   private String description;
+   private int idImage;
+   private Image spriteImage;
+   private int xPosition;
+   private int yPosition;
+   private int directionX;
+   private int directionY;
+   private int speed;
+   private int stepsRemaining;
+   private Environment environment;
+   private Random rand;
+   private ImageView sprite;
+   private static final int FRAME_WIDTH = 90;
+   private static final int FRAME_HEIGHT = 96;
+   private static final int FRAME_COUNT = 2;
+   private static final int LEFT_Y = 96;
+   private static final int RIGHT_Y = 0;
+   private Timeline animation;
+   private int currentFrame;
+   private boolean isOutOfBounds;
+   private boolean isStaticMode;
+
+   public MarineLife(int id, String name, String classification, int points, String description, int idImage) {
+      this.stepsRemaining = 45;
+      this.currentFrame = 0;
+      this.isOutOfBounds = false;
+      this.isStaticMode = false;
+      this.id = id;
+      this.name = name;
+      this.classification = classification != null ? classification : "Unknown";
+      this.points = points;
+      this.description = description;
+      this.idImage = idImage;
+      this.initializeSprite();
+   }
+
+   public MarineLife(int id, String name, String classification, int points, String description, int speed, Environment environment, Image spriteSheet) {
+      this(id, name, classification, points, description, 0);
+      this.speed = speed;
+      this.environment = environment;
+      this.spriteImage = spriteSheet;
+      this.rand = new Random();
+      if (spriteSheet != null) {
+         this.sprite = new ImageView(spriteSheet);
+         this.sprite.setViewport(new Rectangle2D(0.0, 0.0, 90.0, 96.0));
+         this.setupAnimation();
+      }
+
+   }
+
+   public void initializePositionAndDirection() {
+      if (!this.isStaticMode) {
+         boolean spawnAtMinX = this.rand.nextBoolean();
+         if (spawnAtMinX) {
+            this.xPosition = this.environment.getMinX();
+            this.directionX = 1;
+            this.sprite.setViewport(new Rectangle2D(0.0, 0.0, 90.0, 96.0));
+         } else {
+            this.xPosition = this.environment.getMaxX();
+            this.directionX = -1;
+            this.sprite.setViewport(new Rectangle2D(0.0, 96.0, 90.0, 96.0));
+         }
+
+         this.yPosition = this.rand.nextInt(this.environment.getMaxY() - this.environment.getMinY() + 1) + this.environment.getMinY();
+         this.directionY = this.rand.nextBoolean() ? 1 : -1;
+      }
+
+   }
+
+   public void move() {
+      if (!this.isStaticMode) {
+         int newXPosition = this.xPosition + this.directionX * this.speed;
+         if (newXPosition >= this.environment.getMinX() - 90 && newXPosition <= this.environment.getMaxX() + 90) {
+            this.xPosition = newXPosition;
+            if (this.stepsRemaining > 0) {
+               int newYPosition = this.yPosition + this.directionY * this.speed;
+               if (newYPosition < this.environment.getMinY()) {
+                  this.directionY = 1;
+                  newYPosition = this.environment.getMinY();
+               } else if (newYPosition > this.environment.getMaxY() - 96) {
+                  this.directionY = -1;
+                  newYPosition = this.environment.getMaxY() - 96;
+               }
+
+               this.yPosition = newYPosition;
+               --this.stepsRemaining;
+            } else {
+               this.stepsRemaining = 45;
+               this.directionY = this.rand.nextBoolean() ? 1 : -1;
+            }
+
+            this.updateSpriteDirection();
+         } else {
+            this.isOutOfBounds = true;
+         }
+      }
+   }
+
+   public void setStaticMode(boolean staticMode) {
+      this.isStaticMode = staticMode;
+   }
+
+   public void centerInPane(double paneWidth, double paneHeight) {
+      if (this.sprite != null) {
+         this.sprite.setLayoutX((paneWidth - this.sprite.getFitWidth()) / 2.0);
+         this.sprite.setLayoutY((paneHeight - this.sprite.getFitHeight()) / 2.0);
+      }
+
+   }
+
+   private void initializeSprite() {
+      if (this.sprite == null) {
+         Image image = this.getImage();
+         if (image != null) {
+            this.sprite = new ImageView(image);
+            this.sprite.setViewport(new Rectangle2D(0.0, 0.0, 90.0, 96.0));
+            this.sprite.setFitWidth(90.0);
+            this.sprite.setFitHeight(96.0);
+            this.setupAnimation();
+         }
+      }
+
+   }
+
+   private void updateSpriteDirection() {
+      if (this.directionX == 1) {
+         this.sprite.setViewport(new Rectangle2D((double)(this.currentFrame * 90), 0.0, 90.0, 96.0));
+      } else {
+         this.sprite.setViewport(new Rectangle2D((double)(this.currentFrame * 90), 96.0, 90.0, 96.0));
+      }
+
+   }
+
+   private void setupAnimation() {
+      this.animation = new Timeline(new KeyFrame[]{new KeyFrame(Duration.millis(200.0), (event) -> {
+         this.updateFrame();
+      }, new KeyValue[0])});
+      this.animation.setCycleCount(-1);
+   }
+
+   private void updateFrame() {
+      this.currentFrame = (this.currentFrame + 1) % 2;
+      if (this.isStaticMode) {
+         this.sprite.setViewport(new Rectangle2D((double)(this.currentFrame * 90), 0.0, 90.0, 96.0));
+      } else {
+         this.updateSpriteDirection();
+      }
+
+   }
+
+   public void startAnimation() {
+      if (this.animation != null) {
+         this.animation.play();
+      }
+
+   }
+
+   public void stopAnimation() {
+      if (this.animation != null) {
+         this.animation.stop();
+      }
+
+   }
+
+   public Image getImage() {
+      if (this.spriteImage == null && this.idImage > 0) {
+         byte[] imageData = ImageDAO.getImageById(this.idImage);
+         if (imageData != null) {
+            this.spriteImage = new Image(new ByteArrayInputStream(imageData));
+         }
+      }
+
+      return this.spriteImage;
+   }
+
+   public int getId() {
+      return this.id;
+   }
+
+   public String getName() {
+      return this.name;
+   }
+
+   public String getClassification() {
+      return this.classification;
+   }
+
+   public void setClassification(String classification) {
+      this.classification = classification;
+   }
+
+   public int getPoints() {
+      return this.points;
+   }
+
+   public String getDescription() {
+      return this.description;
+   }
+
+   public int getIdImage() {
+      return this.idImage;
+   }
+
+   public void setIdImage(int idImage) {
+      this.idImage = idImage;
+   }
+
+   public ImageView getSprite() {
+      return this.sprite;
+   }
+
+   public int getXPosition() {
+      return this.xPosition;
+   }
+
+   public void setXPosition(int xPosition) {
+      this.xPosition = xPosition;
+   }
+
+   public int getYPosition() {
+      return this.yPosition;
+   }
+
+   public void setYPosition(int yPosition) {
+      this.yPosition = yPosition;
+   }
+
+   public Environment getEnvironment() {
+      return this.environment;
+   }
+
+   public void setEnvironment(Environment environment) {
+      this.environment = environment;
+   }
+
+   public int getSpeed() {
+      return this.speed;
+   }
+
+   public void setSpeed(int speed) {
+      this.speed = speed;
+   }
+
+   public Random getRand() {
+      return this.rand;
+   }
+
+   public void setRand(Random rand) {
+      this.rand = rand;
+   }
+
+   public boolean isOutOfBounds() {
+      return this.isOutOfBounds;
+   }
+
+   public void changeDirection() {
+      this.directionX *= -1;
+      this.updateSpriteDirection();
+   }
+}
