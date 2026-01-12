@@ -1,1 +1,250 @@
+// Source code is decompiled from a .class file using FernFlower decompiler (from Intellij IDEA).
+package dao;
+
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Timestamp;
+import java.util.ArrayList;
+import java.util.List;
+import model.History;
+
+public class HistoryDAO {
+   private static final String URL = "jdbc:mysql://localhost:3306/tomas";
+   private static final String USER = "root";
+   private static final String PASSWORD = "";
+
+   public HistoryDAO() {
+   }
+
+   public static List<History> getHistoryById(int userId) {
+      List<History> historyList = new ArrayList();
+      String query = "SELECT h.id_history, h.level, h.date, h.score, u.id_user, u.username FROM history h INNER JOIN user u ON h.id_user = u.id_user WHERE u.id_user = ? ORDER BY h.date DESC";
+
+      try {
+         Throwable var3 = null;
+         Object var4 = null;
+
+         try {
+            Connection con = DriverManager.getConnection("jdbc:mysql://localhost:3306/tomas", "root", "");
+
+            try {
+               PreparedStatement st = con.prepareStatement(query);
+
+               try {
+                  st.setInt(1, userId);
+                  Throwable var7 = null;
+                  Object var8 = null;
+
+                  try {
+                     ResultSet rs = st.executeQuery();
+
+                     try {
+                        while(rs.next()) {
+                           int idHistory = rs.getInt("id_history");
+                           String level = rs.getString("level");
+                           Timestamp date = rs.getTimestamp("date");
+                           int score = rs.getInt("score");
+                           String username = rs.getString("username");
+                           History history = new History(idHistory, level, date, score, username);
+                           historyList.add(history);
+                        }
+                     } finally {
+                        if (rs != null) {
+                           rs.close();
+                        }
+
+                     }
+                  } catch (Throwable var47) {
+                     if (var7 == null) {
+                        var7 = var47;
+                     } else if (var7 != var47) {
+                        var7.addSuppressed(var47);
+                     }
+
+                     throw var7;
+                  }
+               } finally {
+                  if (st != null) {
+                     st.close();
+                  }
+
+               }
+            } catch (Throwable var49) {
+               if (var3 == null) {
+                  var3 = var49;
+               } else if (var3 != var49) {
+                  var3.addSuppressed(var49);
+               }
+
+               if (con != null) {
+                  con.close();
+               }
+
+               throw var3;
+            }
+
+            if (con != null) {
+               con.close();
+            }
+         } catch (Throwable var50) {
+            if (var3 == null) {
+               var3 = var50;
+            } else if (var3 != var50) {
+               var3.addSuppressed(var50);
+            }
+
+            throw var3;
+         }
+      } catch (SQLException var51) {
+         var51.printStackTrace();
+      }
+
+      return historyList;
+   }
+
+   public static int getTotalScore(int userId) {
+      int totalScore = 0;
+      String query = "    SELECT SUM(m.points) AS totalScore\n    FROM user_catch uc\n    JOIN marinelife m ON uc.id_marinelife = m.id_marinelife\n    WHERE uc.id_user = ?\n";
+
+      try {
+         Throwable var3 = null;
+         Object var4 = null;
+
+         try {
+            Connection con = DriverManager.getConnection("jdbc:mysql://localhost:3306/tomas", "root", "");
+
+            try {
+               PreparedStatement st = con.prepareStatement(query);
+
+               try {
+                  st.setInt(1, userId);
+                  Throwable var7 = null;
+                  Object var8 = null;
+
+                  try {
+                     ResultSet rs = st.executeQuery();
+
+                     try {
+                        if (rs.next()) {
+                           totalScore = rs.getInt("totalScore");
+                        }
+                     } finally {
+                        if (rs != null) {
+                           rs.close();
+                        }
+
+                     }
+                  } catch (Throwable var41) {
+                     if (var7 == null) {
+                        var7 = var41;
+                     } else if (var7 != var41) {
+                        var7.addSuppressed(var41);
+                     }
+
+                     throw var7;
+                  }
+               } finally {
+                  if (st != null) {
+                     st.close();
+                  }
+
+               }
+            } catch (Throwable var43) {
+               if (var3 == null) {
+                  var3 = var43;
+               } else if (var3 != var43) {
+                  var3.addSuppressed(var43);
+               }
+
+               if (con != null) {
+                  con.close();
+               }
+
+               throw var3;
+            }
+
+            if (con != null) {
+               con.close();
+            }
+         } catch (Throwable var44) {
+            if (var3 == null) {
+               var3 = var44;
+            } else if (var3 != var44) {
+               var3.addSuppressed(var44);
+            }
+
+            throw var3;
+         }
+      } catch (SQLException var45) {
+         System.err.println("Error fetching total score by user ID: " + var45.getMessage());
+         var45.printStackTrace();
+      }
+
+      return totalScore;
+   }
+
+   public static boolean addHistory(String level, Timestamp date, int score, int userId) {
+      boolean isAdded = false;
+      String query = "    INSERT INTO history (level, date, score, id_user)\n    VALUES (?, ?, ?, ?)\n";
+
+      try {
+         Throwable var6 = null;
+         Object var7 = null;
+
+         try {
+            Connection con = DriverManager.getConnection("jdbc:mysql://localhost:3306/tomas", "root", "");
+
+            try {
+               PreparedStatement st = con.prepareStatement(query);
+
+               try {
+                  st.setString(1, level);
+                  st.setTimestamp(2, date);
+                  st.setInt(3, score);
+                  st.setInt(4, userId);
+                  int rowsAffected = st.executeUpdate();
+                  isAdded = rowsAffected > 0;
+               } finally {
+                  if (st != null) {
+                     st.close();
+                  }
+
+               }
+            } catch (Throwable var24) {
+               if (var6 == null) {
+                  var6 = var24;
+               } else if (var6 != var24) {
+                  var6.addSuppressed(var24);
+               }
+
+               if (con != null) {
+                  con.close();
+               }
+
+               throw var6;
+            }
+
+            if (con != null) {
+               con.close();
+            }
+         } catch (Throwable var25) {
+            if (var6 == null) {
+               var6 = var25;
+            } else if (var6 != var25) {
+               var6.addSuppressed(var25);
+            }
+
+            throw var6;
+         }
+      } catch (SQLException var26) {
+         System.err.println("Error adding history: " + var26.getMessage());
+         var26.printStackTrace();
+      }
+
+      return isAdded;
+   }
+}
 
