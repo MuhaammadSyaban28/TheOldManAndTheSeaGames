@@ -1,0 +1,32 @@
+// Source code is decompiled from a .class file using FernFlower decompiler (from Intellij IDEA).
+package model;
+
+public class Environment {
+   private int minX;
+   private int maxX;
+   private int minY;
+   private int maxY;
+
+   public Environment(double minX, double maxX, double minY, double maxY) {
+      this.minX = (int)minX;
+      this.maxX = (int)maxX;
+      this.minY = (int)minY;
+      this.maxY = (int)maxY;
+   }
+
+   public int getMinX() {
+      return this.minX;
+   }
+
+   public int getMaxX() {
+      return this.maxX;
+   }
+
+   public int getMinY() {
+      return this.minY;
+   }
+
+   public int getMaxY() {
+      return this.maxY;
+   }
+}
