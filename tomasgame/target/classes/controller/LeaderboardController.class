@@ -1,1 +1,132 @@
+// Source code is decompiled from a .class file using FernFlower decompiler (from Intellij IDEA).
+package controller;
+
+import dao.LeaderboardDAO;
+import java.io.File;
+import java.io.IOException;
+import java.net.URL;
+import java.util.List;
+import java.util.ResourceBundle;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
+import javafx.fxml.FXML;
+import javafx.fxml.FXMLLoader;
+import javafx.fxml.Initializable;
+import javafx.scene.Parent;
+import javafx.scene.Scene;
+import javafx.scene.control.Button;
+import javafx.scene.control.TableColumn;
+import javafx.scene.control.TableView;
+import javafx.scene.control.cell.PropertyValueFactory;
+import javafx.scene.input.MouseEvent;
+import javafx.scene.media.Media;
+import javafx.scene.media.MediaPlayer;
+import javafx.stage.Stage;
+import model.Leaderboard;
+
+public class LeaderboardController implements Initializable {
+   @FXML
+   private TableView<Leaderboard> leaderboardTable;
+   @FXML
+   private Button backBtn;
+   @FXML
+   private Button mediumBtn;
+   @FXML
+   private Button easyBtn;
+   @FXML
+   private Button hardBtn;
+   @FXML
+   private TableColumn<Leaderboard, Integer> rankColumn;
+   @FXML
+   private TableColumn<Leaderboard, String> playersColumn;
+   @FXML
+   private TableColumn<Leaderboard, Integer> pointsColumn;
+   private final String HIGHLIGHT = "-fx-background-color: #0078D7; -fx-text-fill: white;";
+   private final String DEFAULT = "-fx-background-color: transparent; -fx-text-fill: black;";
+   private MediaPlayer mediaPlayer;
+   private LeaderboardDAO leaderboardDAO;
+
+   public LeaderboardController() {
+   }
+
+   public void initialize(URL url, ResourceBundle rb) {
+      this.leaderboardDAO = new LeaderboardDAO();
+      this.rankColumn.setCellValueFactory(new PropertyValueFactory("rank"));
+      this.playersColumn.setCellValueFactory(new PropertyValueFactory("username"));
+      this.pointsColumn.setCellValueFactory(new PropertyValueFactory("score"));
+      this.loadLeaderboardData("EASY");
+      this.highlightButton(this.mediumBtn);
+      this.playBackgroundMusic();
+   }
+
+   @FXML
+   private void easyClick(MouseEvent event) {
+      this.loadLeaderboardData("EASY");
+      this.highlightButton(this.easyBtn);
+   }
+
+   @FXML
+   private void mediumClick(MouseEvent event) {
+      this.loadLeaderboardData("MEDIUM");
+      this.highlightButton(this.mediumBtn);
+   }
+
+   @FXML
+   private void hardClick(MouseEvent event) {
+      this.loadLeaderboardData("HARD");
+      this.highlightButton(this.hardBtn);
+   }
+
+   @FXML
+   private void LeaderboardBack(MouseEvent event) {
+      try {
+         this.stopBackgroundMusic();
+         URL url = (new File("src/main/java/view/MainMenu.fxml")).toURI().toURL();
+         Parent root = (Parent)FXMLLoader.load(url);
+         Stage stage = (Stage)this.backBtn.getScene().getWindow();
+         Scene scene = new Scene(root);
+         stage.setScene(scene);
+         stage.show();
+      } catch (IOException var6) {
+         var6.printStackTrace();
+      }
+
+   }
+
+   private void loadLeaderboardData(String level) {
+      List<Leaderboard> leaderboardData = LeaderboardDAO.getLeaderboardByLevel(level);
+      ObservableList<Leaderboard> top10 = FXCollections.observableArrayList();
+
+      for(int i = 0; i < Math.min(10, leaderboardData.size()); ++i) {
+         Leaderboard next = (Leaderboard)leaderboardData.get(i);
+         next.setRank(i + 1);
+         top10.add(next);
+      }
+
+      this.leaderboardTable.setItems(top10);
+   }
+
+   private void highlightButton(Button activeButton) {
+      this.easyBtn.setStyle("-fx-background-color: transparent; -fx-text-fill: black;");
+      this.mediumBtn.setStyle("-fx-background-color: transparent; -fx-text-fill: black;");
+      this.hardBtn.setStyle("-fx-background-color: transparent; -fx-text-fill: black;");
+      activeButton.setStyle("-fx-background-color: #0078D7; -fx-text-fill: white;");
+   }
+
+   private void playBackgroundMusic() {
+      String musicFile = "src/main/java/assets/leaderboard.mp3";
+      File musicPath = new File(musicFile);
+      Media media = new Media(musicPath.toURI().toString());
+      this.mediaPlayer = new MediaPlayer(media);
+      this.mediaPlayer.setCycleCount(-1);
+      this.mediaPlayer.play();
+   }
+
+   private void stopBackgroundMusic() {
+      if (this.mediaPlayer != null) {
+         this.mediaPlayer.stop();
+      }
+
+   }
+}
 
