@@ -1,1 +1,112 @@
+// Source code is decompiled from a .class file using FernFlower decompiler (from Intellij IDEA).
+package dao;
+
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import model.Leaderboard;
+
+public class LeaderboardDAO {
+   private static PreparedStatement st;
+   private static Connection con;
+
+   public LeaderboardDAO() {
+   }
+
+   public static List<Leaderboard> getLeaderboardByLevel(String level) {
+      List<Leaderboard> leaderboardList = new ArrayList();
+      Set<Integer> uniqueUserIds = new HashSet();
+      String query = "    SELECT\n        ROW_NUMBER() OVER (ORDER BY score DESC) AS rank,\n        user.id_user,\n        user.username,\n        history.level,\n        history.score,\n        history.date\n    FROM\n        history\n    JOIN\n        user\n    ON\n        history.id_user = user.id_user\n    WHERE\n        history.level = ?\n    ORDER BY\n        history.score DESC\n";
+
+      try {
+         Throwable var4 = null;
+         Object var5 = null;
+
+         try {
+            Connection con = BaseDAO.getCon();
+
+            try {
+               PreparedStatement st = con.prepareStatement(query);
+
+               try {
+                  st.setString(1, level);
+                  Throwable var8 = null;
+                  Object var9 = null;
+
+                  try {
+                     ResultSet rs = st.executeQuery();
+
+                     try {
+                        while(rs.next()) {
+                           int userId = rs.getInt("id_user");
+                           if (!uniqueUserIds.contains(userId)) {
+                              uniqueUserIds.add(userId);
+                              int rank = rs.getInt("rank");
+                              String username = rs.getString("username");
+                              String levelResult = rs.getString("level");
+                              int score = rs.getInt("score");
+                              String date = rs.getString("date");
+                              Leaderboard leaderboard = new Leaderboard(rank, username, levelResult, score, date);
+                              leaderboardList.add(leaderboard);
+                           }
+                        }
+                     } finally {
+                        if (rs != null) {
+                           rs.close();
+                        }
+
+                     }
+                  } catch (Throwable var49) {
+                     if (var8 == null) {
+                        var8 = var49;
+                     } else if (var8 != var49) {
+                        var8.addSuppressed(var49);
+                     }
+
+                     throw var8;
+                  }
+               } finally {
+                  if (st != null) {
+                     st.close();
+                  }
+
+               }
+            } catch (Throwable var51) {
+               if (var4 == null) {
+                  var4 = var51;
+               } else if (var4 != var51) {
+                  var4.addSuppressed(var51);
+               }
+
+               if (con != null) {
+                  con.close();
+               }
+
+               throw var4;
+            }
+
+            if (con != null) {
+               con.close();
+            }
+         } catch (Throwable var52) {
+            if (var4 == null) {
+               var4 = var52;
+            } else if (var4 != var52) {
+               var4.addSuppressed(var52);
+            }
+
+            throw var4;
+         }
+      } catch (SQLException var53) {
+         var53.printStackTrace();
+      }
+
+      return leaderboardList;
+   }
+}
 
