@@ -1,1 +1,735 @@
+// Source code is decompiled from a .class file using FernFlower decompiler (from Intellij IDEA).
+package controller;
+
+import dao.HistoryDAO;
+import dao.ImageDAO;
+import dao.MarineLifeDAO;
+import dao.UserCatchDAO;
+import java.io.ByteArrayInputStream;
+import java.io.File;
+import java.io.IOException;
+import java.net.URL;
+import java.sql.SQLException;
+import java.sql.Timestamp;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Optional;
+import java.util.Random;
+import java.util.ResourceBundle;
+import javafx.animation.KeyFrame;
+import javafx.animation.KeyValue;
+import javafx.animation.Timeline;
+import javafx.application.Platform;
+import javafx.fxml.FXML;
+import javafx.fxml.FXMLLoader;
+import javafx.fxml.Initializable;
+import javafx.geometry.Rectangle2D;
+import javafx.scene.Parent;
+import javafx.scene.Scene;
+import javafx.scene.control.Alert;
+import javafx.scene.control.Button;
+import javafx.scene.control.ButtonType;
+import javafx.scene.control.Label;
+import javafx.scene.control.ProgressBar;
+import javafx.scene.control.Alert.AlertType;
+import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
+import javafx.scene.input.KeyEvent;
+import javafx.scene.input.MouseEvent;
+import javafx.scene.layout.AnchorPane;
+import javafx.scene.media.Media;
+import javafx.scene.media.MediaPlayer;
+import javafx.stage.Stage;
+import javafx.util.Duration;
+import model.Diver;
+import model.Environment;
+import model.MarineLife;
+import model.User;
+
+public class GameController implements Initializable {
+   @FXML
+   private AnchorPane gamePane1;
+   @FXML
+   private ImageView diverSprite;
+   @FXML
+   private Label timerLabel;
+   @FXML
+   private Button backButton;
+   @FXML
+   private ImageView marineLifeSprite;
+   @FXML
+   private Label scoreLabel;
+   @FXML
+   private ProgressBar healthPoint;
+   @FXML
+   private ImageView obstacleSprite;
+   private static final double CATCH_DISTANCE = 50.0;
+   private MediaPlayer mediaPlayer;
+   private Diver diver;
+   private static final int ANIMATION_DURATION = 130;
+   private static final int IDLE_ANIMATION_DURATION = 130;
+   private static final double MAX_WIDTH = 1280.0;
+   private static final double MAX_HEIGHT = 720.0;
+   private int currentFrame = 0;
+   private int currentDirectionY = 0;
+   private boolean isMoving = false;
+   private Timeline animationTimeline;
+   private Timeline idleAnimationTimeline;
+   private Timeline countdownTimer;
+   private Timeline marineLifeSpawnTimeline;
+   private Timeline marineLifeMovementTimeline;
+   private int remainingTimeInSeconds = 60;
+   private Random random = new Random();
+   private ArrayList<MarineLife> marineLifeList = new ArrayList();
+   private List<Integer> sessionCatches = new ArrayList();
+
+   public GameController() {
+   }
+
+   public void initialize(URL url, ResourceBundle rb) {
+      this.playBackgroundMusic();
+
+      try {
+         this.initializeDiver();
+         this.setupSprite();
+         this.setupKeyboardControls();
+         this.setupAnimation();
+         this.startTimer();
+         this.startMarineLifeSpawning();
+         this.startMarineLifeMovement();
+         this.animateMarineLife();
+      } catch (SQLException var5) {
+         var5.printStackTrace();
+         Alert alert = new Alert(AlertType.ERROR);
+         alert.setTitle("Initialization Error");
+         alert.setHeaderText("Game Initialization Failed");
+         alert.setContentText("Failed to initialize game components!");
+         alert.showAndWait();
+      }
+
+   }
+
+   private void initializeDiver() throws SQLException {
+      ArrayList<byte[]> images = ImageDAO.getImages();
+      if (images != null && !images.isEmpty()) {
+         byte[] imageData = (byte[])images.get(0);
+         Image spriteImage = new Image(new ByteArrayInputStream(imageData));
+         User user = new User("1", "Player", "password");
+         this.diver = new Diver(user, 100.0, 100.0, spriteImage);
+      } else {
+         throw new IllegalStateException("No diver sprite found in the database.");
+      }
+   }
+
+   private void setupSprite() {
+      if (this.diver != null) {
+         this.diverSprite.setImage(this.diver.getSprite().getImage());
+         this.diverSprite.setViewport(new Rectangle2D(0.0, 0.0, (double)this.diver.getFrameWidth(), (double)this.diver.getFrameHeight()));
+      }
+
+   }
+
+   private void setupKeyboardControls() {
+      this.diverSprite.sceneProperty().addListener((obs, oldScene, newScene) -> {
+         if (newScene != null) {
+            newScene.setOnKeyPressed(this::handleKeyPressed);
+            newScene.setOnKeyReleased(this::handleKeyReleased);
+         }
+
+      });
+   }
+
+   private void handleKeyPressed(KeyEvent event) {
+      if (this.diver != null) {
+         switch (event.getCode()) {
+            case A:
+               this.diver.setLeftPressed(true);
+               break;
+            case D:
+               this.diver.setRightPressed(true);
+               break;
+            case S:
+               this.diver.setDownPressed(true);
+               break;
+            case W:
+               this.diver.setUpPressed(true);
+         }
+
+         this.isMoving = true;
+         this.idleAnimationTimeline.stop();
+      }
+   }
+
+   private void handleKeyReleased(KeyEvent event) {
+      if (this.diver != null) {
+         switch (event.getCode()) {
+            case A:
+               this.diver.setLeftPressed(false);
+               break;
+            case D:
+               this.diver.setRightPressed(false);
+               break;
+            case S:
+               this.diver.setDownPressed(false);
+               break;
+            case W:
+               this.diver.setUpPressed(false);
+         }
+
+         if (!this.diver.isUpPressed() && !this.diver.isDownPressed() && !this.diver.isLeftPressed() && !this.diver.isRightPressed()) {
+            this.isMoving = false;
+            this.idleAnimationTimeline.play();
+         }
+
+      }
+   }
+
+   private void startMarineLifeMovement() {
+      this.marineLifeMovementTimeline = new Timeline(new KeyFrame[]{new KeyFrame(Duration.seconds(0.1), (e) -> {
+         this.updateMarineLifeMovement();
+      }, new KeyValue[0])});
+      this.marineLifeMovementTimeline.setCycleCount(-1);
+      this.marineLifeMovementTimeline.play();
+   }
+
+   private void updateMarineLifeMovement() {
+      ArrayList<MarineLife> marineLifeToRemove = new ArrayList();
+      Iterator var3 = this.marineLifeList.iterator();
+
+      while(true) {
+         MarineLife marineLife;
+         do {
+            if (!var3.hasNext()) {
+               var3 = marineLifeToRemove.iterator();
+
+               while(var3.hasNext()) {
+                  marineLife = (MarineLife)var3.next();
+                  this.gamePane1.getChildren().remove(marineLife.getSprite());
+                  this.marineLifeList.remove(marineLife);
+               }
+
+               return;
+            }
+
+            marineLife = (MarineLife)var3.next();
+            marineLife.move();
+            marineLife.getSprite().setLayoutX((double)marineLife.getXPosition());
+            marineLife.getSprite().setLayoutY((double)marineLife.getYPosition());
+         } while(marineLife.getXPosition() >= 0 && !((double)marineLife.getXPosition() > 1280.0));
+
+         marineLifeToRemove.add(marineLife);
+      }
+   }
+
+   private void setupAnimation() {
+      this.animationTimeline = new Timeline(new KeyFrame[]{new KeyFrame(Duration.millis(130.0), (e) -> {
+         this.updateAnimation();
+      }, new KeyValue[0])});
+      this.animationTimeline.setCycleCount(-1);
+      this.animationTimeline.play();
+      this.idleAnimationTimeline = new Timeline(new KeyFrame[]{new KeyFrame(Duration.millis(130.0), (e) -> {
+         this.updateIdleAnimation();
+      }, new KeyValue[0])});
+      this.idleAnimationTimeline.setCycleCount(-1);
+      this.idleAnimationTimeline.play();
+   }
+
+   private void updateAnimation() {
+      if (this.diver != null && this.diverSprite.getScene() != null) {
+         if (this.isMoving) {
+            this.currentFrame = (this.currentFrame + 1) % this.diver.getFrameCount();
+            if (this.diver.isRightPressed()) {
+               this.currentDirectionY = this.diver.getRightY();
+            } else if (this.diver.isLeftPressed()) {
+               this.currentDirectionY = this.diver.getLeftY();
+            } else if (this.diver.isUpPressed()) {
+               this.currentDirectionY = this.diver.getUpY();
+            } else if (this.diver.isDownPressed()) {
+               this.currentDirectionY = this.diver.getDownY();
+            }
+
+            this.diverSprite.setViewport(new Rectangle2D((double)(this.currentFrame * this.diver.getFrameWidth()), (double)this.currentDirectionY, (double)this.diver.getFrameWidth(), (double)this.diver.getFrameHeight()));
+         }
+
+         this.diver.updatePosition(1280.0, 720.0);
+         this.ensureInBounds();
+         this.diverSprite.setX(this.diver.getXPosition());
+         this.diverSprite.setY(this.diver.getYPosition());
+         this.checkCollisionWithMarineLife();
+      }
+   }
+
+   private void checkCollisionWithMarineLife() {
+      ArrayList<MarineLife> caughtMarineLifeList = new ArrayList();
+      double diverX = this.diver.getXPosition();
+      double diverY = this.diver.getYPosition();
+      Iterator var7 = this.marineLifeList.iterator();
+
+      MarineLife marineLife;
+      while(var7.hasNext()) {
+         marineLife = (MarineLife)var7.next();
+         double distance = Math.sqrt(Math.pow((double)marineLife.getXPosition() - diverX, 2.0) + Math.pow((double)marineLife.getYPosition() - diverY, 2.0));
+         if (distance <= 50.0) {
+            caughtMarineLifeList.add(marineLife);
+
+            try {
+               UserCatchDAO.addUserCatch(LoginController.user.getUid(), marineLife.getId());
+            } catch (Exception var12) {
+               var12.printStackTrace();
+               Alert alert = new Alert(AlertType.ERROR);
+               alert.setTitle("Error");
+               alert.setHeaderText("Database Error");
+               alert.setContentText("Failed to save catch to database!");
+               alert.showAndWait();
+            }
+
+            this.sessionCatches.add(marineLife.getId());
+         }
+      }
+
+      var7 = caughtMarineLifeList.iterator();
+
+      while(var7.hasNext()) {
+         marineLife = (MarineLife)var7.next();
+         this.marineLifeList.remove(marineLife);
+         this.removeCaughtMarineLife(marineLife);
+      }
+
+   }
+
+   private void updateIdleAnimation() {
+      if (this.diver != null && !this.isMoving) {
+         this.currentFrame = (this.currentFrame + 1) % this.diver.getFrameCount();
+         this.diverSprite.setViewport(new Rectangle2D((double)(this.currentFrame * this.diver.getFrameWidth()), (double)this.diver.getUpY(), (double)this.diver.getFrameWidth(), (double)this.diver.getFrameHeight()));
+      }
+   }
+
+   private void ensureInBounds() {
+      if (this.diver.getXPosition() < 0.0) {
+         this.diver.setXPosition(0.0);
+      } else if (this.diver.getXPosition() > 1280.0 - (double)this.diver.getFrameWidth()) {
+         this.diver.setXPosition(1280.0 - (double)this.diver.getFrameWidth());
+      }
+
+      if (this.diver.getYPosition() < 0.0) {
+         this.diver.setYPosition(0.0);
+      } else if (this.diver.getYPosition() > 720.0 - (double)this.diver.getFrameHeight()) {
+         this.diver.setYPosition(720.0 - (double)this.diver.getFrameHeight());
+      }
+
+   }
+
+   private void startTimer() {
+      this.countdownTimer = new Timeline(new KeyFrame[]{new KeyFrame(Duration.seconds(1.0), (e) -> {
+         this.updateTimer();
+      }, new KeyValue[0])});
+      this.countdownTimer.setCycleCount(-1);
+      this.countdownTimer.play();
+   }
+
+   private void updateTimer() {
+      if (this.remainingTimeInSeconds > 0) {
+         --this.remainingTimeInSeconds;
+         int minutes = this.remainingTimeInSeconds / 60;
+         int seconds = this.remainingTimeInSeconds % 60;
+         this.timerLabel.setText(String.format("TIMER: %02d:%02d", minutes, seconds));
+      } else {
+         this.countdownTimer.stop();
+         this.timerLabel.setText("Time's up!");
+         this.endGame();
+      }
+
+   }
+
+   private void startMarineLifeSpawning() {
+      this.marineLifeSpawnTimeline = new Timeline(new KeyFrame[]{new KeyFrame(Duration.seconds(1.0), (e) -> {
+         this.spawnMarineLife();
+      }, new KeyValue[0])});
+      this.marineLifeSpawnTimeline.setCycleCount(-1);
+      this.marineLifeSpawnTimeline.play();
+   }
+
+   private double getRandomSpawnInterval() {
+      return 3.0 + this.random.nextDouble() * 5.0;
+   }
+
+   private void updateSpawnInterval() {
+      this.marineLifeSpawnTimeline.stop();
+      this.marineLifeSpawnTimeline.getKeyFrames().clear();
+      this.marineLifeSpawnTimeline.getKeyFrames().add(new KeyFrame(Duration.seconds(this.getRandomSpawnInterval()), (e) -> {
+         this.spawnMarineLife();
+         this.updateSpawnInterval();
+      }, new KeyValue[0]));
+      this.marineLifeSpawnTimeline.play();
+   }
+
+   private MarineLife MarineLife1(double xPosition, double yPosition) throws SQLException {
+      ArrayList<byte[]> images = ImageDAO.getImages();
+      if (images != null && !images.isEmpty() && images.size() > 1) {
+         byte[] imageData = (byte[])images.get(1);
+         Image spriteImage = new Image(new ByteArrayInputStream(imageData));
+         Environment environment = new Environment(0.0, this.gamePane1.getWidth(), 0.0, this.gamePane1.getHeight());
+         MarineLife marineLife = new MarineLife(1, "Marine Life Type 1", "Classification", 10, "Description", 10, environment, spriteImage);
+         marineLife.initializePositionAndDirection();
+         return marineLife;
+      } else {
+         throw new IllegalStateException("Tidak ada data ikan didata Base");
+      }
+   }
+
+   private MarineLife MarineLife2(double xPosition, double yPosition) throws SQLException {
+      ArrayList<byte[]> images = ImageDAO.getImages();
+      if (images != null && !images.isEmpty() && images.size() > 2) {
+         byte[] imageData = (byte[])images.get(2);
+         Image spriteImage = new Image(new ByteArrayInputStream(imageData));
+         Environment environment = new Environment(0.0, this.gamePane1.getWidth(), 0.0, this.gamePane1.getHeight());
+         MarineLife marineLife = new MarineLife(2, "Marine Life Type 2", "Classification", 20, "Description", 15, environment, spriteImage);
+         marineLife.initializePositionAndDirection();
+         return marineLife;
+      } else {
+         throw new IllegalStateException("Tidak ada data ikan didata Base");
+      }
+   }
+
+   private MarineLife MarineLife3(double xPosition, double yPosition) throws SQLException {
+      ArrayList<byte[]> images = ImageDAO.getImages();
+      if (images != null && !images.isEmpty() && images.size() > 2) {
+         byte[] imageData = (byte[])images.get(3);
+         Image spriteImage = new Image(new ByteArrayInputStream(imageData));
+         Environment environment = new Environment(3.0, this.gamePane1.getWidth(), 0.0, this.gamePane1.getHeight());
+         MarineLife marineLife = new MarineLife(3, "Marine Life Type 3", "Classification", 30, "Description", 15, environment, spriteImage);
+         marineLife.initializePositionAndDirection();
+         return marineLife;
+      } else {
+         throw new IllegalStateException("NTidak ada data ikan didata Base");
+      }
+   }
+
+   private MarineLife MarineLife4(double xPosition, double yPosition) throws SQLException {
+      ArrayList<byte[]> images = ImageDAO.getImages();
+      if (images != null && !images.isEmpty() && images.size() > 1) {
+         byte[] imageData = (byte[])images.get(4);
+         Image spriteImage = new Image(new ByteArrayInputStream(imageData));
+         Environment environment = new Environment(0.0, this.gamePane1.getWidth(), 0.0, this.gamePane1.getHeight());
+         MarineLife marineLife = new MarineLife(4, "Marine Life Type 1", "Classification", 10, "Description", 10, environment, spriteImage);
+         marineLife.initializePositionAndDirection();
+         return marineLife;
+      } else {
+         throw new IllegalStateException("Tidak ada data ikan didata Base");
+      }
+   }
+
+   private MarineLife MarineLife5(double xPosition, double yPosition) throws SQLException {
+      ArrayList<byte[]> images = ImageDAO.getImages();
+      if (images != null && !images.isEmpty() && images.size() > 1) {
+         byte[] imageData = (byte[])images.get(5);
+         Image spriteImage = new Image(new ByteArrayInputStream(imageData));
+         Environment environment = new Environment(0.0, this.gamePane1.getWidth(), 0.0, this.gamePane1.getHeight());
+         MarineLife marineLife = new MarineLife(5, "Marine Life Type 1", "Classification", 10, "Description", 10, environment, spriteImage);
+         marineLife.initializePositionAndDirection();
+         return marineLife;
+      } else {
+         throw new IllegalStateException("Tidak ada data ikan didata Base");
+      }
+   }
+
+   private MarineLife MarineLife6(double xPosition, double yPosition) throws SQLException {
+      ArrayList<byte[]> images = ImageDAO.getImages();
+      if (images != null && !images.isEmpty() && images.size() > 1) {
+         byte[] imageData = (byte[])images.get(6);
+         Image spriteImage = new Image(new ByteArrayInputStream(imageData));
+         Environment environment = new Environment(0.0, this.gamePane1.getWidth(), 0.0, this.gamePane1.getHeight());
+         MarineLife marineLife = new MarineLife(6, "Marine Life Type 1", "Classification", 10, "Description", 10, environment, spriteImage);
+         marineLife.initializePositionAndDirection();
+         return marineLife;
+      } else {
+         throw new IllegalStateException("Tidak ada data ikan didata Base");
+      }
+   }
+
+   private MarineLife MarineLife7(double xPosition, double yPosition) throws SQLException {
+      ArrayList<byte[]> images = ImageDAO.getImages();
+      if (images != null && !images.isEmpty() && images.size() > 1) {
+         byte[] imageData = (byte[])images.get(7);
+         Image spriteImage = new Image(new ByteArrayInputStream(imageData));
+         Environment environment = new Environment(0.0, this.gamePane1.getWidth(), 0.0, this.gamePane1.getHeight());
+         MarineLife marineLife = new MarineLife(7, "Marine Life Type 1", "Classification", 10, "Description", 10, environment, spriteImage);
+         marineLife.initializePositionAndDirection();
+         return marineLife;
+      } else {
+         throw new IllegalStateException("Tidak ada data ikan didata Base");
+      }
+   }
+
+   private MarineLife MarineLife8(double xPosition, double yPosition) throws SQLException {
+      ArrayList<byte[]> images = ImageDAO.getImages();
+      if (images != null && !images.isEmpty() && images.size() > 1) {
+         byte[] imageData = (byte[])images.get(8);
+         Image spriteImage = new Image(new ByteArrayInputStream(imageData));
+         Environment environment = new Environment(0.0, this.gamePane1.getWidth(), 0.0, this.gamePane1.getHeight());
+         MarineLife marineLife = new MarineLife(8, "Marine Life Type 1", "Classification", 10, "Description", 10, environment, spriteImage);
+         marineLife.initializePositionAndDirection();
+         return marineLife;
+      } else {
+         throw new IllegalStateException("Tidak ada data ikan didata Base");
+      }
+   }
+
+   private MarineLife MarineLife9(double xPosition, double yPosition) throws SQLException {
+      ArrayList<byte[]> images = ImageDAO.getImages();
+      if (images != null && !images.isEmpty() && images.size() > 1) {
+         byte[] imageData = (byte[])images.get(9);
+         Image spriteImage = new Image(new ByteArrayInputStream(imageData));
+         Environment environment = new Environment(0.0, this.gamePane1.getWidth(), 0.0, this.gamePane1.getHeight());
+         MarineLife marineLife = new MarineLife(9, "Marine Life Type 1", "Classification", 10, "Description", 10, environment, spriteImage);
+         marineLife.initializePositionAndDirection();
+         return marineLife;
+      } else {
+         throw new IllegalStateException("Tidak ada data ikan didata Base");
+      }
+   }
+
+   private void spawnMarineLife() {
+      try {
+         double xPosition = this.random.nextDouble() * 1230.0;
+         double yPosition = this.random.nextDouble() * 670.0;
+         int randomType = this.random.nextInt(8);
+         MarineLife newMarineLife;
+         if (randomType == 0) {
+            newMarineLife = this.MarineLife1(xPosition, yPosition);
+         } else if (randomType == 1) {
+            newMarineLife = this.MarineLife2(xPosition, yPosition);
+         } else if (randomType == 2) {
+            newMarineLife = this.MarineLife3(xPosition, yPosition);
+         } else if (randomType == 3) {
+            newMarineLife = this.MarineLife4(xPosition, yPosition);
+         } else if (randomType == 4) {
+            newMarineLife = this.MarineLife5(xPosition, yPosition);
+         } else if (randomType == 5) {
+            newMarineLife = this.MarineLife6(xPosition, yPosition);
+         } else if (randomType == 6) {
+            newMarineLife = this.MarineLife7(xPosition, yPosition);
+         } else if (randomType == 7) {
+            newMarineLife = this.MarineLife8(xPosition, yPosition);
+         } else {
+            newMarineLife = this.MarineLife9(xPosition, yPosition);
+         }
+
+         this.marineLifeList.add(newMarineLife);
+         this.gamePane1.getChildren().add(newMarineLife.getSprite());
+         newMarineLife.startAnimation();
+      } catch (SQLException var7) {
+         var7.printStackTrace();
+      }
+
+   }
+
+   private MarineLife catchMarineLife() {
+      MarineLife caughtMarineLife = null;
+      double diverX = this.diver.getXPosition();
+      double diverY = this.diver.getYPosition();
+      Iterator var7 = this.marineLifeList.iterator();
+
+      while(var7.hasNext()) {
+         MarineLife marineLife = (MarineLife)var7.next();
+         double distance = Math.sqrt(Math.pow((double)marineLife.getXPosition() - diverX, 2.0) + Math.pow((double)marineLife.getYPosition() - diverY, 2.0));
+         if (distance <= 50.0) {
+            caughtMarineLife = marineLife;
+            break;
+         }
+      }
+
+      return caughtMarineLife;
+   }
+
+   private void removeCaughtMarineLife(MarineLife marineLife) {
+      this.gamePane1.getChildren().remove(marineLife.getSprite());
+   }
+
+   private void animateMarineLife() {
+      this.marineLifeMovementTimeline = new Timeline(new KeyFrame[]{new KeyFrame(Duration.millis(50.0), (e) -> {
+         this.updateMarineLifeSprite();
+      }, new KeyValue[0])});
+      this.marineLifeMovementTimeline.setCycleCount(-1);
+      this.marineLifeMovementTimeline.play();
+   }
+
+   private void updateMarineLifeSprite() {
+      if (this.marineLifeSprite != null) {
+         double newX = this.marineLifeSprite.getLayoutX() + (this.random.nextDouble() - 0.5) * 10.0;
+         double newY = this.marineLifeSprite.getLayoutY() + (this.random.nextDouble() - 0.5) * 10.0;
+         if (newX < 0.0) {
+            newX = 0.0;
+         }
+
+         if (newX > 1280.0 - this.marineLifeSprite.getFitWidth()) {
+            newX = 1280.0 - this.marineLifeSprite.getFitWidth();
+         }
+
+         if (newY < 0.0) {
+            newY = 0.0;
+         }
+
+         if (newY > 720.0 - this.marineLifeSprite.getFitHeight()) {
+            newY = 720.0 - this.marineLifeSprite.getFitHeight();
+         }
+
+         this.marineLifeSprite.setLayoutX(newX);
+         this.marineLifeSprite.setLayoutY(newY);
+      }
+
+   }
+
+   @FXML
+   public void handleBack(MouseEvent event) {
+      this.stopBackgroundMusic();
+      Alert confirmationAlert = new Alert(AlertType.CONFIRMATION);
+      confirmationAlert.setTitle("Keluar");
+      confirmationAlert.setHeaderText("Apakah Anda yakin ingin keluar?");
+      confirmationAlert.setContentText("Progres tidak akan ke save");
+      Optional<ButtonType> result = confirmationAlert.showAndWait();
+      if (result.isPresent() && result.get() == ButtonType.OK) {
+         try {
+            URL url = (new File("src/main/java/view/MainMenu.fxml")).toURI().toURL();
+            Parent root = (Parent)FXMLLoader.load(url);
+            Stage stage = (Stage)this.backButton.getScene().getWindow();
+            Scene scene = new Scene(root);
+            stage.setScene(scene);
+            stage.show();
+         } catch (IOException var8) {
+            var8.printStackTrace();
+            Alert alert = new Alert(AlertType.ERROR);
+            alert.setTitle("Loading Error");
+            alert.setHeaderText("Failed to Load Main Menu");
+            alert.setContentText("Check your FXML file!");
+            alert.showAndWait();
+         }
+      }
+
+   }
+
+   private void endGame() {
+      if (this.countdownTimer != null) {
+         this.countdownTimer.stop();
+      }
+
+      if (this.marineLifeMovementTimeline != null) {
+         this.marineLifeMovementTimeline.stop();
+      }
+
+      if (this.marineLifeSpawnTimeline != null) {
+         this.marineLifeSpawnTimeline.stop();
+      }
+
+      if (this.animationTimeline != null) {
+         this.animationTimeline.stop();
+      }
+
+      if (this.idleAnimationTimeline != null) {
+         this.idleAnimationTimeline.stop();
+      }
+
+      int totalScore = this.calculateTotalScoreForSession();
+
+      try {
+         if (LoginController.user != null) {
+            String level = "EASY";
+            Timestamp date = new Timestamp(System.currentTimeMillis());
+            boolean isSaved = HistoryDAO.addHistory(level, date, totalScore, LoginController.user.getUid());
+            if (isSaved) {
+               System.out.println("Game history saved successfully!");
+            } else {
+               System.out.println("Failed to save game history!");
+            }
+         } else {
+            System.out.println("Pengguna tidak masuk game tidak bisa di save ke histori!");
+         }
+      } catch (Exception var5) {
+         var5.printStackTrace();
+         Alert alert = new Alert(AlertType.ERROR);
+         alert.setTitle("Error");
+         alert.setHeaderText("Game History Save Failed");
+         alert.setContentText("An error occurred while saving game history!");
+         alert.showAndWait();
+      }
+
+      Platform.runLater(() -> {
+         Alert scoreAlert = new Alert(AlertType.INFORMATION);
+         scoreAlert.setTitle("Game Over");
+         scoreAlert.setHeaderText("Waktu Habis!");
+         scoreAlert.setContentText("Skor Akhir Anda: " + totalScore);
+         scoreAlert.showAndWait();
+         this.stopBackgroundMusic();
+
+         try {
+            URL url = (new File("src/main/java/view/MainMenu.fxml")).toURI().toURL();
+            Parent root = (Parent)FXMLLoader.load(url);
+            Stage stage = (Stage)this.gamePane1.getScene().getWindow();
+            Scene scene = new Scene(root);
+            stage.setScene(scene);
+            stage.show();
+         } catch (IOException var7) {
+            var7.printStackTrace();
+            Alert alert = new Alert(AlertType.ERROR);
+            alert.setTitle("Loading Error");
+            alert.setHeaderText("Failed to Load Main Menu");
+            alert.setContentText("Check your FXML file!");
+            alert.showAndWait();
+         }
+
+      });
+   }
+
+   public void addUserCatch(int userId, int marineLifeId) {
+      UserCatchDAO.addUserCatch(userId, marineLifeId);
+      this.sessionCatches.add(marineLifeId);
+   }
+
+   private int calculateTotalScoreForSession() {
+      int totalScore = 0;
+
+      int marineLifeId;
+      for(Iterator var3 = this.sessionCatches.iterator(); var3.hasNext(); totalScore += MarineLifeDAO.getMarineLifePoints(marineLifeId)) {
+         marineLifeId = (Integer)var3.next();
+      }
+
+      return totalScore;
+   }
+
+   public boolean saveGameSession(String level, int userId) {
+      int totalScore = this.calculateTotalScoreForSession();
+      Timestamp currentDate = new Timestamp(System.currentTimeMillis());
+      return HistoryDAO.addHistory(level, currentDate, totalScore, userId);
+   }
+
+   public void resetSession() {
+      this.sessionCatches.clear();
+   }
+
+   private void playBackgroundMusic() {
+      String musicFile = "src/main/java/assets/backsound.mp3";
+      File musicPath = new File(musicFile);
+      if (musicPath.exists()) {
+         Media media = new Media(musicPath.toURI().toString());
+         this.mediaPlayer = new MediaPlayer(media);
+         this.mediaPlayer.setCycleCount(-1);
+         this.mediaPlayer.play();
+      } else {
+         Alert alert = new Alert(AlertType.WARNING);
+         alert.setTitle("Warning");
+         alert.setHeaderText("Musik Tidak Ditemukan");
+         alert.setContentText("Musik yang Anda cari tidak ditemukan!");
+         alert.showAndWait();
+      }
+
+   }
+
+   private void stopBackgroundMusic() {
+      if (this.mediaPlayer != null) {
+         this.mediaPlayer.stop();
+      }
+
+   }
+}
 
