@@ -1,1 +1,97 @@
+// Source code is decompiled from a .class file using FernFlower decompiler (from Intellij IDEA).
+package dao;
+
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import model.User;
+
+public class UserDAO {
+   private static PreparedStatement st;
+   private static Connection con;
+
+   public UserDAO() {
+   }
+
+   public static User validate(String name, String password) {
+      User u = null;
+
+      try {
+         con = BaseDAO.getCon();
+         String query = "SELECT id_user, username, password FROM user WHERE username = ? AND password = ?";
+         st = con.prepareStatement(query);
+         st.setString(1, name);
+         st.setString(2, password);
+         ResultSet rs = st.executeQuery();
+         if (rs.next()) {
+            u = new User(rs.getInt("id_user"), rs.getString("username"), password);
+         }
+      } catch (SQLException var8) {
+         System.err.println("Error validating user: " + var8.getMessage());
+      } finally {
+         BaseDAO.closeCon(con);
+      }
+
+      return u;
+   }
+
+   public static void registerUser(User u) {
+      try {
+         con = BaseDAO.getCon();
+         String query = "INSERT INTO user (username, password) VALUES (?, ?)";
+         st = con.prepareStatement(query);
+         st.setString(1, u.getUname());
+         st.setString(2, u.getPass());
+         st.executeUpdate();
+      } catch (SQLException var5) {
+         System.err.println("Error registering user: " + var5.getMessage());
+      } finally {
+         BaseDAO.closeCon(con);
+      }
+
+   }
+
+   public static boolean isUsernameTaken(String username) {
+      boolean isTaken = false;
+
+      try {
+         con = BaseDAO.getCon();
+         String query = "SELECT COUNT(*) FROM user WHERE username = ?";
+         st = con.prepareStatement(query);
+         st.setString(1, username);
+         ResultSet rs = st.executeQuery();
+         if (rs.next()) {
+            isTaken = rs.getInt(1) > 0;
+         }
+      } catch (SQLException var7) {
+         System.err.println("Error checking username: " + var7.getMessage());
+      } finally {
+         BaseDAO.closeCon(con);
+      }
+
+      return isTaken;
+   }
+
+   public static User getUsername(String username) {
+      User u = null;
+
+      try {
+         con = BaseDAO.getCon();
+         String query = "SELECT id_user, username, password FROM user WHERE username = ?";
+         st = con.prepareStatement(query);
+         st.setString(1, username);
+         ResultSet rs = st.executeQuery();
+         if (rs.next()) {
+            u = new User(rs.getInt("id_user"), rs.getString("username"), rs.getString("password"));
+         }
+      } catch (SQLException var7) {
+         System.err.println("Error fetching user: " + var7.getMessage());
+      } finally {
+         BaseDAO.closeCon(con);
+      }
+
+      return u;
+   }
+}
 
