@@ -1,1 +1,59 @@
+// Source code is decompiled from a .class file using FernFlower decompiler (from Intellij IDEA).
+package dao;
+
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.util.ArrayList;
+
+public class ImageDAO extends BaseDAO {
+   private static PreparedStatement st;
+   private static Connection con;
+
+   public ImageDAO() {
+   }
+
+   public static ArrayList<byte[]> getImages() {
+      ArrayList<byte[]> result = new ArrayList();
+
+      try {
+         con = getCon();
+         String sql = "SELECT name, data FROM images";
+         st = con.prepareStatement(sql);
+         ResultSet rs = st.executeQuery();
+
+         while(rs.next()) {
+            result.add(rs.getBytes("data"));
+         }
+      } catch (SQLException var6) {
+         var6.printStackTrace();
+      } finally {
+         closeCon(con);
+      }
+
+      return result;
+   }
+
+   public static byte[] getImageById(int imageId) {
+      byte[] imageData = null;
+
+      try {
+         con = getCon();
+         String sql = "SELECT data FROM images WHERE id_image = ?";
+         st = con.prepareStatement(sql);
+         st.setInt(1, imageId);
+         ResultSet rs = st.executeQuery();
+         if (rs.next()) {
+            imageData = rs.getBytes("data");
+         }
+      } catch (SQLException var7) {
+         System.err.println("Error fetching image by ID: " + var7.getMessage());
+      } finally {
+         closeCon(con);
+      }
+
+      return imageData;
+   }
+}
 
