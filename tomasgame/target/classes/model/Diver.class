@@ -1,0 +1,291 @@
+// Source code is decompiled from a .class file using FernFlower decompiler (from Intellij IDEA).
+package model;
+
+import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
+
+public class Diver extends User {
+   private double xPosition;
+   private double yPosition;
+   private int caughtFish = 0;
+   private int catchRadius = 50;
+   private double HP = 100.0;
+   private int score = 0;
+   private double velocityX = 0.0;
+   private double velocityY = 0.0;
+   private static final double PLAYER_SPEED = 3.0;
+   private static final double FRICTION = 0.8;
+   private static final double MIN_VELOCITY = 0.1;
+   private ImageView sprite;
+   private static final int FRAME_WIDTH = 128;
+   private static final int FRAME_HEIGHT = 128;
+   private static final int UP_Y = 0;
+   private static final int DOWN_Y = 384;
+   private static final int LEFT_Y = 512;
+   private static final int RIGHT_Y = 128;
+   private static final int FRAME_COUNT = 12;
+   private boolean upPressed;
+   private boolean downPressed;
+   private boolean leftPressed;
+   private boolean rightPressed;
+
+   public Diver(User user, double xPosition, double yPosition, Image spriteImage) {
+      super(user.getUid(), user.getUname(), user.getPass());
+      this.xPosition = xPosition;
+      this.yPosition = yPosition;
+      this.sprite = new ImageView(spriteImage);
+      this.sprite.setFitWidth((double)(this.catchRadius * 2));
+      this.sprite.setFitHeight((double)(this.catchRadius * 2));
+      this.sprite.setX(xPosition);
+      this.sprite.setY(yPosition);
+   }
+
+   public void setUpPressed(boolean upPressed) {
+      this.upPressed = upPressed;
+   }
+
+   public void setDownPressed(boolean downPressed) {
+      this.downPressed = downPressed;
+   }
+
+   public void setLeftPressed(boolean leftPressed) {
+      this.leftPressed = leftPressed;
+   }
+
+   public void setRightPressed(boolean rightPressed) {
+      this.rightPressed = rightPressed;
+   }
+
+   public boolean isUpPressed() {
+      return this.upPressed;
+   }
+
+   public boolean isDownPressed() {
+      return this.downPressed;
+   }
+
+   public boolean isLeftPressed() {
+      return this.leftPressed;
+   }
+
+   public boolean isRightPressed() {
+      return this.rightPressed;
+   }
+
+   public void updatePosition(double paneWidth, double paneHeight) {
+      if (this.upPressed) {
+         this.velocityY -= 3.0;
+      }
+
+      if (this.downPressed) {
+         this.velocityY += 3.0;
+      }
+
+      if (this.leftPressed) {
+         this.velocityX -= 3.0;
+      }
+
+      if (this.rightPressed) {
+         this.velocityX += 3.0;
+      }
+
+      if (!this.upPressed && !this.downPressed) {
+         this.velocityY *= 0.8;
+      }
+
+      if (!this.leftPressed && !this.rightPressed) {
+         this.velocityX *= 0.8;
+      }
+
+      if (Math.abs(this.velocityX) < 0.1) {
+         this.velocityX = 0.0;
+      }
+
+      if (Math.abs(this.velocityY) < 0.1) {
+         this.velocityY = 0.0;
+      }
+
+      this.xPosition += this.velocityX;
+      this.yPosition += this.velocityY;
+      this.xPosition = Math.max(0.0, Math.min(paneWidth - 128.0, this.xPosition));
+      this.yPosition = Math.max(0.0, Math.min(paneHeight - 128.0, this.yPosition));
+      this.sprite.setX(this.xPosition);
+      this.sprite.setY(this.yPosition);
+   }
+
+   public int getCaughtFish() {
+      return this.caughtFish;
+   }
+
+   public User getUser() {
+      return new User(this.getUid(), this.getUname(), this.getPass());
+   }
+
+   public static double getPLAYER_SPEED() {
+      return 3.0;
+   }
+
+   public static double getFRICTION() {
+      return 0.8;
+   }
+
+   public static double getMIN_VELOCITY() {
+      return 0.1;
+   }
+
+   public static int getFRAME_WIDTH() {
+      return 128;
+   }
+
+   public static int getFRAME_HEIGHT() {
+      return 128;
+   }
+
+   public static int getUP_Y() {
+      return 0;
+   }
+
+   public static int getDOWN_Y() {
+      return 384;
+   }
+
+   public static int getLEFT_Y() {
+      return 512;
+   }
+
+   public static int getRIGHT_Y() {
+      return 128;
+   }
+
+   public static int getFRAME_COUNT() {
+      return 12;
+   }
+
+   public void setScore(int score) {
+      this.score = score;
+   }
+
+   public void setVelocityX(double velocityX) {
+      this.velocityX = velocityX;
+   }
+
+   public void setVelocityY(double velocityY) {
+      this.velocityY = velocityY;
+   }
+
+   public void setSprite(ImageView sprite) {
+      this.sprite = sprite;
+   }
+
+   public void setCaughtFish(int caughtFish) {
+      this.caughtFish = caughtFish;
+   }
+
+   public int getCatchRadius() {
+      return this.catchRadius;
+   }
+
+   public void setCatchRadius(int catchRadius) {
+      this.catchRadius = catchRadius;
+      this.sprite.setFitWidth((double)(catchRadius * 2));
+      this.sprite.setFitHeight((double)(catchRadius * 2));
+   }
+
+   public double getHP() {
+      return this.HP;
+   }
+
+   public void setHP(double HP) {
+      this.HP = Math.max(0.0, Math.min(100.0, HP));
+   }
+
+   public int getScore() {
+      return this.score;
+   }
+
+   public void addScore(int points) {
+      this.score += points;
+   }
+
+   public Image getImage() {
+      return this.sprite.getImage();
+   }
+
+   public ImageView getSprite() {
+      return this.sprite;
+   }
+
+   public void setSpriteImage(Image image) {
+      this.sprite.setImage(image);
+   }
+
+   public int getFrameWidth() {
+      return 128;
+   }
+
+   public int getFrameHeight() {
+      return 128;
+   }
+
+   public int getUpY() {
+      return 0;
+   }
+
+   public int getDownY() {
+      return 384;
+   }
+
+   public int getLeftY() {
+      return 512;
+   }
+
+   public int getRightY() {
+      return 128;
+   }
+
+   public int getFrameCount() {
+      return 12;
+   }
+
+   public double getXPosition() {
+      return this.xPosition;
+   }
+
+   public void setXPosition(double xPosition) {
+      this.xPosition = xPosition;
+      this.sprite.setX(xPosition);
+   }
+
+   public double getYPosition() {
+      return this.yPosition;
+   }
+
+   public void setYPosition(double yPosition) {
+      this.yPosition = yPosition;
+      this.sprite.setY(yPosition);
+   }
+
+   public double getVelocityX() {
+      return this.velocityX;
+   }
+
+   public double getVelocityY() {
+      return this.velocityY;
+   }
+
+   public double getxPosition() {
+      return this.xPosition;
+   }
+
+   public void setxPosition(double xPosition) {
+      this.xPosition = xPosition;
+   }
+
+   public double getyPosition() {
+      return this.yPosition;
+   }
+
+   public void setyPosition(double yPosition) {
+      this.yPosition = yPosition;
+   }
+}
